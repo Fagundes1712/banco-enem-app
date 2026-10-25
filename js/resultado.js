@@ -23,11 +23,7 @@ function result() {
           ? h("div", null, h("b", null, String(T.blank)), h("span", null, "em branco"))
           : null
       ),
-      h(
-        "p",
-        { class: "note" },
-        "Estimativa simplificada no modelo TRI de 3 parâmetros, com dificuldade média para todas as questões. A nota oficial do INEP pesa cada item pela sua dificuldade e pela coerência das respostas, então use este número só como referência."
-      ),
+      h("p", { class: "note" }, notaComo()),
       h(
         "div",
         { class: "nav spaced" },
@@ -40,6 +36,11 @@ function result() {
       )
     )
   );
+}
+
+// Explica de onde veio a nota.
+function notaComo() {
+  return "Nota que estudantes com a mesma proporção de acertos tiraram no Enem de 2022 a 2025 (mediana oficial do INEP, base da TRI). Toda questão vale o mesmo, de qualquer ano. A nota oficial também pesa quais questões você acertou, então ela pode variar uns 30 pontos para cima ou para baixo.";
 }
 
 /* ============================= Correções ============================= */
