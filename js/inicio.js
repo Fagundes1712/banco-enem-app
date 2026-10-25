@@ -24,10 +24,10 @@ function home() {
           class: "chip mode",
           type: "button",
           "aria-pressed": S.modo === k,
-          onclick: () => {
+          onclick: () => keep(() => {
             S.modo = k;
             home();
-          },
+          }),
         },
         n
       )
@@ -42,17 +42,17 @@ function home() {
       h(
         "div",
         { class: "chips", role: "group", "aria-labelledby": "nl" },
-        [5, 10, 25, 45].map((n) =>
+        QTDS.filter((n) => n <= avail).map((n) =>
           h(
             "button",
             {
               class: "chip",
               type: "button",
               "aria-pressed": S.n === n,
-              onclick: () => {
+              onclick: () => keep(() => {
                 S.n = n;
                 home();
-              },
+              }),
             },
             n
           )
@@ -98,7 +98,8 @@ function home() {
                 h(
                   "span",
                   { class: "item-meta" },
-                  plural(s.topics.length, "tópico", "tópicos") + " · " + plural(n, "questão", "questões")
+                  (s.topics.length > 1 ? plural(s.topics.length, "tópico", "tópicos") + " · " : "") +
+                    plural(n, "questão", "questões")
                 )
               )
             );
@@ -164,11 +165,11 @@ function home() {
             "data-sigla": k,
             "data-n": plural(inArea(k).length, "questão", "questões"),
             tabindex: k === S.area ? 0 : -1,
-            onclick: () => {
+            onclick: () => k !== S.area && swap(() => keep(() => {
               S = { ...S, area: k };
               home();
-              document.getElementById("tab-" + k)?.focus();
-            },
+              document.getElementById("tab-" + k)?.focus({ preventScroll: true });
+            })),
           },
           n
         )
@@ -204,6 +205,8 @@ function materia(id) {
   clearInterval(tick);
   if (T) T.live = false;
   const s = IX.sub[id];
+  // Matéria de um tópico só (Inglês, Espanhol) vai direto para as questões.
+  if (s.topics.length === 1) return topico(s.topics[0].id);
   S = { ...S, materia: id, topico: null };
   document.documentElement.dataset.area = s.area;
   nav("inicio");

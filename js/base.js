@@ -9,8 +9,11 @@ const AREAS = {
   LC: ["Linguagens", "Português, Literatura, Línguas, Artes"],
 };
 
-const APL = { regular: "Regular", ppl: "PPL", reaplicacao: "Reaplicação", digital: "Digital" };
-const SIT = { todas: "Todas", nao: "Não respondidas", resp: "Respondidas", ok: "Acertadas", bad: "Erradas" };
+// Situação só existe em Suas respostas, onde tudo já foi respondido.
+const SIT = { todas: "Todas", resp: "Respondidas", ok: "Acertadas", bad: "Erradas" };
+const QTDS = [5, 10, 25, 45];
+// Faixas do parâmetro b oficial do INEP (tools/microdados.py), do 1 ao 5.
+const NIVEIS = ["Leve", "Moderado", "Intenso", "Radical", "Extremo"];
 const HKEY = "banco-enem:hist";
 
 const $ = document.getElementById("app");
@@ -37,7 +40,8 @@ function h(t, a, ...k) {
 }
 
 function mount(...n) {
-  $.replaceChildren(...n.flat());
+  // replaceChildren escreveria "null" na tela para filhos vazios.
+  $.replaceChildren(...n.flat().filter((x) => x != null));
   // Durante a prova a barra lateral some, para não sair sem querer.
   document.documentElement.toggleAttribute("data-exam", !!(T && T.live));
   $.classList.remove("in");
@@ -45,6 +49,57 @@ function mount(...n) {
   $.classList.add("in");
   $.focus({ preventScroll: true });
   scrollTo(0, 0);
+}
+
+// Redesenha a mesma tela sem pular para o topo (troca de área, filtros).
+function keep(fn) {
+  const y = scrollY;
+  fn();
+  scrollTo(0, y);
+}
+
+// Transição entre áreas e abas: a tela se desfaz em quadrados pretos que
+// acendem em ordem aleatória, a tela nova é desenhada por baixo e os
+// quadrados se apagam, também ao acaso. Só opacity; com movimento reduzido
+// o véu inteiro faz um fade. Sem animate() (testes), troca direto.
+let veu = null;
+let veuFila = null;
+const PIX = { dur: 140, ida: 260, volta: 300 };
+function veuGrade() {
+  const lado = Math.max(44, Math.ceil(innerWidth / 18));
+  const cols = Math.ceil(innerWidth / lado);
+  const n = cols * Math.ceil(innerHeight / lado);
+  if (veu && veu.dataset.n === String(n)) return veu;
+  veu?.remove();
+  veu = h("div", { class: "veu", "aria-hidden": "true", "data-n": n, style: "--lado:" + lado + "px;--cols:" + cols });
+  for (let i = 0; i < n; i++) veu.append(h("i"));
+  return document.body.appendChild(veu);
+}
+function swap(fn) {
+  if (!document.body.animate) return fn();
+  if (veuFila) return void (veuFila = fn);
+  veuFila = fn;
+  const v = veuGrade();
+  const calmo = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const pix = calmo ? [] : [...v.children];
+  const anima = (de, ate, max) => {
+    if (calmo) return v.animate([{ opacity: de }, { opacity: ate }], { duration: 150, fill: "forwards" });
+    for (const p of pix)
+      p.animate([{ opacity: de }, { opacity: ate }], {
+        duration: PIX.dur,
+        delay: Math.random() * max,
+        easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+        fill: "both",
+      });
+  };
+  anima(0, 1, PIX.ida);
+  // Relógio, não o fim da animação: com a aba parada a troca acontece igual.
+  setTimeout(() => {
+    const f = veuFila;
+    veuFila = null;
+    f();
+    anima(1, 0, PIX.volta);
+  }, calmo ? 150 : PIX.ida + PIX.dur + 40);
 }
 
 function shuffle(a) {
@@ -132,6 +187,8 @@ function boot(d, t) {
     for (const s of a.subjects) {
       IX.sub[s.id] = { ...s, area: a.id };
       for (const x of s.topics) IX.top[x.id] = { ...x, area: a.id, materia: s.id };
+      // Ids de tópicos que foram reunidos: blocos antigos ainda acham o tópico.
+      for (const x of s.topics) for (const v of x.antes || []) IX.top[v] ||= IX.top[x.id];
     }
   for (const q of Q) q._ok = !!q.topico && consistent(q);
   home();
@@ -220,5 +277,16 @@ function sit(q) {
 }
 
 const num = (n) => n.toLocaleString("pt-BR");
+
+// Selo do nível de dificuldade; sem parâmetro oficial, nada aparece.
+const nivel = (q) =>
+  q.nivel
+    ? h(
+        "span",
+        { class: "q-nivel", "data-nivel": q.nivel, "aria-label": "Dificuldade: " + NIVEIS[q.nivel - 1] },
+        h("i", { "aria-hidden": "true" }, NIVEIS.map(() => h("b"))),
+        NIVEIS[q.nivel - 1]
+      )
+    : null;
 const plural = (n, um, varios) => num(n) + " " + (n === 1 ? um : varios);
 
